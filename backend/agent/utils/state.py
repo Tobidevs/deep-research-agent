@@ -20,7 +20,7 @@ class AgentState(MessagesState):
     # Messages exchanged between agents and supervisor
     supervisor_message = Annotated[Sequence[BaseMessage], add_messages]
     # Notes collected during the research process
-    notes = Annotated[list[str], operator.add] = []
+    notes = Annotated[list[str], Field(default_factory=list, description="Notes collected during the research process.")]
     # Final report generated after the research process
     final_report: str
     

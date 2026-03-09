@@ -1,42 +1,69 @@
 import os
 from .state import AgentState, ClarifyWithUser, ResearchQuestion
-from .prompts import CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT
+from .prompts import (
+    CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT,
+    TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT,
+)
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage
 from dotenv import load_dotenv
-from langgraph.graph import Command, StateGraph, START, END
+from langgraph.graph import StateGraph, START, END
+from langgraph.types import Command
+
 from typing import Literal
 from datetime import datetime
+
 load_dotenv()
 
-model = init_chat_model(model="openai:gpt-4.1",)
+model = init_chat_model(
+    model="openai:gpt-4.1",
+)
+
 
 def get_todays_date():
     """Return today's date as a string."""
     return datetime.now().strftime("%a %b %-d, %Y")
 
 
-def clarify_with_user(state: AgentState) -> Command[Literal["write_research_brief"], "__end__"]:
+def clarify_with_user(state: AgentState) -> Command[AgentState]:
     """Clarify the user's question if needed."""
-    
+
     structured_output_model = model.with_structured_output(ClarifyWithUser)
-    
-    response = structured_output_model.invoke(
-        HumanMessage(content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
-            messages=state.messages,
-            date=get_todays_date()
-        ))
+    response = structured_output_model.invoke([
+        HumanMessage(
+            content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
+                messages=state["messages"], date=get_todays_date()
+            )
+        )]
     )
-    
+
     if response.need_clarification:
         return Command(
-            goto="write_research_brief",
-            update={"messages": AIMessage(content=response.question)}
+            goto=END, update={"messages": AIMessage(content=response.question)}
         )
     else:
         return Command(
-            goto="__end__",
-            update={"messages": AIMessage(content=response.verification)}
+            goto="write_research_brief",
+            update={"messages": AIMessage(content=response.verification)},
         )
-    
-    
+
+
+def write_research_brief(state: AgentState):
+    """Write a research brief based on the user's input."""
+
+    structured_output_model = model.with_structured_output(ResearchQuestion)
+    # Generate a research brief based on conversation history
+    response = structured_output_model.invoke(
+        [
+            HumanMessage(
+                content=TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT.format(
+                    messages=state["messages"], date=get_todays_date()
+                )
+            )
+        ]
+    )
+
+    return {
+        "research_brief": response.research_brief,
+        "supervisor_message": [HumanMessage(content=f"{response.research_brief}.")],
+    }
