@@ -16,4 +16,10 @@ deep_researcher_builder.add_edge("write_research_brief", END)
 
 scope_research = deep_researcher_builder.compile()
 
-result = scope_research.invoke({})
+user_input = input("Enter your message: ")
+result = scope_research.invoke({"messages": [HumanMessage(content=user_input)]})
+# AI response
+print(result["messages"][-1].content)
+user_input = input("Enter your message: ")
+result = scope_research.invoke({"messages": result["messages"] + [HumanMessage(content=user_input)]})
+print(result["messages"][-1].content)

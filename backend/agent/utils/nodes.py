@@ -7,8 +7,9 @@ from .prompts import (
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage
 from dotenv import load_dotenv
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import START, END
 from langgraph.types import Command
+from langsmith import traceable
 
 from typing import Literal
 from datetime import datetime
@@ -24,17 +25,19 @@ def get_todays_date():
     """Return today's date as a string."""
     return datetime.now().strftime("%a %b %-d, %Y")
 
-
+@traceable
 def clarify_with_user(state: AgentState) -> Command[AgentState]:
     """Clarify the user's question if needed."""
 
     structured_output_model = model.with_structured_output(ClarifyWithUser)
-    response = structured_output_model.invoke([
-        HumanMessage(
-            content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
-                messages=state["messages"], date=get_todays_date()
+    response = structured_output_model.invoke(
+        [
+            HumanMessage(
+                content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
+                    messages=state["messages"], date=get_todays_date()
+                )
             )
-        )]
+        ]
     )
 
     if response.need_clarification:
@@ -48,6 +51,7 @@ def clarify_with_user(state: AgentState) -> Command[AgentState]:
         )
 
 
+@traceable
 def write_research_brief(state: AgentState):
     """Write a research brief based on the user's input."""
 
