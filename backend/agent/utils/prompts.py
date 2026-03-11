@@ -48,7 +48,8 @@ The messages that have been exchanged so far between yourself and the user are:
 
 Today's date is {date}.
 
-You will return a single research question that will be used to guide the research.
+You will return a single research question that will be used to guide the research. Always respond in valid JSON format with this exact key:
+"research_brief": "<a detailed research question that captures all relevant information from the messages>
 
 Guidelines:
 1. Maximize Specificity and Detail

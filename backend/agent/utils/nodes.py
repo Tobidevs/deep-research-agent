@@ -19,7 +19,9 @@ load_dotenv()
 model = init_chat_model(
     model="openai:gpt-4.1",
 )
-
+# Structured output models
+clarify_model = model.with_structured_output(ClarifyWithUser)
+research_model = model.with_structured_output(ResearchQuestion)
 
 def get_todays_date():
     """Return today's date as a string."""
@@ -29,8 +31,7 @@ def get_todays_date():
 def clarify_with_user(state: AgentState) -> Command[AgentState]:
     """Clarify the user's question if needed."""
 
-    structured_output_model = model.with_structured_output(ClarifyWithUser)
-    response = structured_output_model.invoke(
+    response = clarify_model.invoke(
         [
             HumanMessage(
                 content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
@@ -42,22 +43,21 @@ def clarify_with_user(state: AgentState) -> Command[AgentState]:
 
     if response.need_clarification:
         return Command(
-            goto=END, update={"messages": AIMessage(content=response.question)}
-        )
+        goto=END, update={"messages": [AIMessage(content=response.question)]}
+    )
     else:
         return Command(
-            goto="write_research_brief",
-            update={"messages": AIMessage(content=response.verification)},
-        )
+        goto="write_research_brief",
+        update={"messages": [AIMessage(content=response.verification)]},
+    )
 
 
 @traceable
 def write_research_brief(state: AgentState):
     """Write a research brief based on the user's input."""
 
-    structured_output_model = model.with_structured_output(ResearchQuestion)
     # Generate a research brief based on conversation history
-    response = structured_output_model.invoke(
+    response = research_model.invoke(
         [
             HumanMessage(
                 content=TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT.format(

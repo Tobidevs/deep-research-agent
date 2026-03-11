@@ -14,15 +14,21 @@ class AgentState(MessagesState):
 
     '''
     Main State multi agent research system
+    
+    @param messages: The messages exchanged between the user and the agent
+    @param research_brief: The research brief generated from the user's input
+    @param supervisor_message: The messages exchanged between the agent and the supervisor
+    @param notes: The notes collected during the research process
+    @param final_report: The final report generated after the research process
     '''
     # Research brief from user conversation history 
-    research_brief = Optional[str]
+    research_brief: Optional[str] = None
     # Messages exchanged between agents and supervisor
-    supervisor_message = Annotated[Sequence[BaseMessage], add_messages]
+    supervisor_message: Annotated[Sequence[BaseMessage], add_messages]
     # Notes collected during the research process
-    notes = Annotated[list[str], Field(default_factory=list, description="Notes collected during the research process.")]
+    notes: Annotated[list[str], operator.add]
     # Final report generated after the research process
-    final_report: str
+    final_report: Optional[str] = None
     
     
 # Structured data models for specific aspects of the agent's state
