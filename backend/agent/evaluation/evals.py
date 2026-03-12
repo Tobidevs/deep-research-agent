@@ -7,7 +7,7 @@ from .datasets import (
     criteria_2,
 )
 from ..agent import scope_research
-from .success_criteria import evaluate_success_criteria
+from .evaluators.success_criteria import evaluate_success_criteria
 
 ls_client = Client()
 dataset_name = "deep-research-scoping"

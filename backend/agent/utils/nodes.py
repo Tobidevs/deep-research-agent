@@ -66,7 +66,7 @@ def write_research_brief(state: AgentState):
             )
         ]
     )
-
+    
     return {
         "research_brief": response.research_brief,
         "supervisor_message": [HumanMessage(content=f"{response.research_brief}.")],

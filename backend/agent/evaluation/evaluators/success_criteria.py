@@ -2,11 +2,11 @@ from pydantic import BaseModel, Field
 from langchain_core.messages import HumanMessage
 from langchain.chat_models import init_chat_model
 
-from .prompts import BRIEF_CRITERIA_PROMPT
+from ..prompts import BRIEF_CRITERIA_PROMPT
 
 
 model = init_chat_model(
-    model="openai:gpt-4.1",
+    model="openai:gpt-4o-mini",
     temperature=0,
 )
 
