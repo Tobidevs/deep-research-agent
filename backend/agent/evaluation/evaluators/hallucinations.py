@@ -17,6 +17,9 @@ class HallucinationEvaluation(BaseModel):
     is_hallucination: bool = Field(
         description="Indicates whether the response contains hallucinated information."
     )
+    reasoning: str = Field(
+        description="The reasoning behind why the response is or isn't considered to contain hallucinations in one short sentence."
+    )
 
 
 def evaluate_hallucinations(outputs: dict, reference_outputs: dict):
@@ -48,16 +51,22 @@ def evaluate_hallucinations(outputs: dict, reference_outputs: dict):
     )
 
     individual_evaluations = [
-        HallucinationEvaluation(is_hallucination=resp.is_hallucination)
+        HallucinationEvaluation(
+            is_hallucination=resp.is_hallucination,
+            reasoning=resp.reasoning
+        )
         for resp in responses
     ]
-    
+
     # Calculate overall score as percentage of criteria captured
     total_count = len(success_criteria)
-    captured_count = sum(1 for eval in individual_evaluations if eval.is_hallucination)
-    print(f"Captured {captured_count} out of {total_count} criteria. \n\n")
+    passed_count = sum(
+        1 for eval in individual_evaluations if not eval.is_hallucination
+    )
+    # Local testing
+    print(f"Passed {passed_count} out of {total_count} criteria. \n\n")
 
     return {
         "key": "hallucination_evaluation",
-        "score": captured_count / total_count if total_count > 0 else 0.0,
+        "score": passed_count / total_count if total_count > 0 else 0.0,
     }

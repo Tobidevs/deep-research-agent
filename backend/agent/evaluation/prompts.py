@@ -29,7 +29,7 @@ BRIEF_HALLUCINATION_PROMPT = """You are a research brief auditor. Determine if t
 {criterion}
 </criterion>
 
-PASS if the brief only includes explicitly stated requirements or logically necessary inferences.
+PASS if the brief only includes explicitly stated requirements or logically necessary inferences based on the criterion.
 FAIL if the brief adds unstated preferences, demographics, geographic details, or narrows scope beyond what the user specified.
 
 Examples:

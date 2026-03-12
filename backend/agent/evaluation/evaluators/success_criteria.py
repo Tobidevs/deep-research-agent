@@ -64,7 +64,8 @@ def evaluate_success_criteria(outputs: dict, reference_outputs: dict):
     # Calculate overall score as percentage of criteria captured
     total_count = len(success_criteria)
     captured_count = sum(1 for eval in individual_evaluations if eval.is_captured)
-    # print(f"Captured {captured_count} out of {total_count} criteria. \n\n")
+    # Local testing
+    print(f"Captured {captured_count} out of {total_count} criteria. \n\n")
 
     return {
         "key": "success_criteria_evaluation",
