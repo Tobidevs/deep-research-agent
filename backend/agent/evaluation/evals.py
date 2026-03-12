@@ -6,8 +6,9 @@ from .datasets import (
     criteria_1,
     criteria_2,
 )
-from ..agent import scope_research
+from ..utils.nodes import write_research_brief
 from .evaluators.success_criteria import evaluate_success_criteria
+from .evaluators.hallucinations import evaluate_hallucinations
 
 ls_client = Client()
 dataset_name = "deep-research-scoping"
@@ -40,21 +41,20 @@ else:
     dataset = ls_client.read_dataset(dataset_name=dataset_name)
 
 
-
 """
 Evaluation of the deep research agent's ability to scope research topics based on user input.
 
-`dataset` is passed into the evaluation loop, where each example's `inputs` are fed into the `scope_research` function,
+`dataset` is passed into the evaluation loop, where each example's `inputs` are fed into the `write_research_brief` function,
 and the output is evaluated against the `success_criteria` using the `evaluate_success_criteria` function.
 
-dataset["inputs"] -> scope_research.invoke(inputs) -> outputs -> evaluate_success_criteria(outputs, reference_outputs=dataset["outputs"])
+dataset["inputs"] -> write_research_brief(inputs) -> outputs -> evaluate_success_criteria(outputs, reference_outputs=dataset["outputs"])
 """
 def target_func(inputs):
-    return scope_research.invoke(inputs)
+    return write_research_brief(inputs)
 
 ls_client.evaluate(
     target_func,
     data=dataset, 
-    evaluators=[evaluate_success_criteria],
+    evaluators=[evaluate_success_criteria, evaluate_hallucinations],
     experiment_prefix="deep-research-scope-eval",
 )

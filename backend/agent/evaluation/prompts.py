@@ -33,8 +33,8 @@ PASS if the brief only includes explicitly stated requirements or logically nece
 FAIL if the brief adds unstated preferences, demographics, geographic details, or narrows scope beyond what the user specified.
 
 Examples:
-- User: "coffee shops in San Francisco" → Brief mentions "trendy spots for young professionals" → FAIL (assumed demographics)
-- User: "2 bed under $3000" → Brief mentions "modern apartments in safe neighborhoods" → FAIL (assumed preferences)
-- User: "2 bed under $3000" → Brief mentions "2-bedroom apartments within $3000 budget" → PASS
+- Criterion: "coffee shops in San Francisco" → Brief mentions "trendy spots for young professionals" → FAIL (assumed demographics)
+- Criterion: "2 bed under $3000" → Brief mentions "modern apartments in safe neighborhoods" → FAIL (assumed preferences)
+- Criterion: "2 bed under $3000" → Brief mentions "2-bedroom apartments within $3000 budget" → PASS
 
 Be strict — if uncertain whether something was user-specified, lean FAIL."""
