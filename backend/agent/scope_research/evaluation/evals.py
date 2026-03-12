@@ -6,7 +6,7 @@ from .datasets import (
     criteria_1,
     criteria_2,
 )
-from ..utils.nodes import write_research_brief
+from ..nodes import write_research_brief
 from .evaluators.success_criteria import evaluate_success_criteria
 from .evaluators.hallucinations import evaluate_hallucinations
 

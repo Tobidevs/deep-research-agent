@@ -2,8 +2,8 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
 
-from .utils.nodes import clarify_with_user, write_research_brief
-from .utils.state import AgentInputState, AgentState
+from .scope_research.nodes import clarify_with_user, write_research_brief
+from .scope_research.state import AgentInputState, AgentState
 
 
 deep_researcher_builder = StateGraph(AgentState, input_schema=AgentInputState)
