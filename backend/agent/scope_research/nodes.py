@@ -18,6 +18,7 @@ load_dotenv()
 
 model = init_chat_model(
     model="openai:gpt-4.1",
+    temperature=0.0,
 )
 # Structured output models
 clarify_model = model.with_structured_output(ClarifyWithUser)
