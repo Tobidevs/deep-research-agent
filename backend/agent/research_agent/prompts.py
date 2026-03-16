@@ -1,7 +1,33 @@
-
 RESEARCH_AGENT_SYSTEM_PROMPT = """Use tavily_search and think_tool to research the given topic.
 After each search, call think_tool to assess what you found, what's still missing, and whether you have enough to answer. Start with broad queries, then narrow.
 Search budget: 2–3 calls for simple questions, up to 5 for complex ones. Stop as soon as you can answer comprehensively."""
 
 RESEARCH_AGENT_USER_PROMPT = """Today's date is {date}.
 {research_topic}"""
+
+SUMMARIZE_WEBPAGE_PROMPT = """Summarize the following webpage for a downstream research agent. Target 25–30% of the original length. 
+Preserve the main topic, key facts, statistics, important quotes, dates, and conclusions.
+
+Today's date is {date}
+
+<webpage_content>
+{webpage_content}
+</webpage_content>
+"""
+
+COMPRESS_RESEARCH_SYSTEM_PROMPT = """Clean up raw research findings from tool calls and web searches into a structured report. Preserve all substantive 
+information verbatim — deduplicate only (e.g. "three sources all stated X"). Skip think_tool calls entirely; include only tavily_search results and web findings.
+
+<Output Format>
+**Queries and Tool Calls Made**
+**Comprehensive Findings** (all sources, inline citations [1], [2]...)
+**Sources**
+[1] Title: URL
+[2] Title: URL
+</Output Format>
+
+Preserving every source is critical — a downstream LLM will merge this report with others."""
+
+COMPRESS_RESEARCH_REMINDER_PROMPT = """The messages above are research findings for:
+    RESEARCH TOPIC: {research_topic} 
+    Produce the compressed report now. Preserve all findings verbatim, include every source and citation, and skip think_tool calls."""

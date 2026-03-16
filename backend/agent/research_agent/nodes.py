@@ -1,0 +1,119 @@
+from langchain.chat_models import init_chat_model
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage, filter_messages
+from typing import Literal
+
+from backend.agent.research_agent.prompts import (
+    COMPRESS_RESEARCH_REMINDER_PROMPT,
+    COMPRESS_RESEARCH_SYSTEM_PROMPT,
+    RESEARCH_AGENT_SYSTEM_PROMPT,
+)
+
+from .state import ResearcherState, ResearcherOutputState, Summary
+from .utils import tavily_search, think_tool
+
+tools = [tavily_search, think_tool]
+tools_dict = {tool.name: tool for tool in tools}
+
+
+model = init_chat_model(model="anthropic:claude-sonnet-4-6")
+model_with_tools = model.bind_tools(tools_dict)
+
+summarization_model = init_chat_model(model="openai:gpt-4o-mini")
+compress_model = init_chat_model(model="openai:gpt-4.1")
+
+
+def llm_call(state: ResearcherState):
+    """Analyze current state and decide on next action.
+    The model analyzes the current conversation state and decides whether to:
+    1. Call search tools to gather more info
+    2. Provide a final answer based on gathered info
+
+    Returns updated state with the model's response.
+    """
+    return {
+        "researcher_messages": [
+            model_with_tools.invoke(
+                [
+                    SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT),
+                ]
+                + state["researcher_messages"],
+            )
+        ]
+    }
+
+
+def tool_node(state: ResearcherState):
+    """Execute all tool calls from previous LLM response.
+    Returns updated state with tool execution results.
+    """
+    tool_calls = state["researcher_messages"][-1].tool_calls
+
+    # Execute each tool call and collect results
+    observations = []
+    for tool_call in tool_calls:
+        tool = tools_dict.get(tool_call.name)
+        observations.append(tool.invoke(tool_call.args))
+
+    # Create tool message outputs
+    tool_outputs = [
+        ToolMessage(
+            content=observation, tool_name=tool_call.name, tool_call_id=tool_call.id
+        )
+        for tool_call, observation in zip(tool_calls, observations)
+    ]
+    return {"researcher_messages": tool_outputs}
+
+
+def should_continue(
+    state: ResearcherState,
+) -> Literal["tool_node", "compress_research"]:
+    """Determine whether to continue research or provide final answer.
+
+    Determines whether the agent should continue the research loop or provide
+    a final answer based on whether the LLM made tool calls.
+
+    Returns:
+        "tool_node": Continue to tool execution
+        "compress_research": Stop and compress research
+    """
+    messages = state["researcher_messages"]
+    last_message = messages[-1]
+
+    # If the LLM makes a tool call, continue to tool execution
+    if last_message.tool_calls:
+        return "tool_node"
+    # Otherwise, we have a final answer
+    return "compress_research"
+
+
+def compress_research(state: ResearcherState):
+    """Compress research findings into a concise summary.
+
+    Takes all the research messages and tool outputs and creates a compressed
+    summary suitable for the supervisor's decision-making.
+    """
+    reminder = HumanMessage(
+        content=COMPRESS_RESEARCH_REMINDER_PROMPT.format(
+            research_topic=state["research_topic"]
+        )
+    )
+
+    messages = (
+        [SystemMessage(content=COMPRESS_RESEARCH_SYSTEM_PROMPT)]
+        + state.get("researcher_messages", [])
+        + [reminder]
+    )
+    response = compress_model.invoke(messages)
+    
+    # Extract raw notes from tool and AI messages
+    raw_notes = [
+        str(m.content) for m in filter_messages(
+            state["researcher_messages"], 
+            include_types=["tool", "ai"]
+        )
+    ]
+
+    return {
+        "compressed_research": str(response.content),
+        "raw_notes": ["\n".join(raw_notes)]
+    }
