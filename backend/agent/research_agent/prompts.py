@@ -28,6 +28,6 @@ information verbatim — deduplicate only (e.g. "three sources all stated X"). S
 
 Preserving every source is critical — a downstream LLM will merge this report with others."""
 
-COMPRESS_RESEARCH_REMINDER_PROMPT = """The messages above are research findings for:
-    RESEARCH TOPIC: {research_topic} 
-    Produce the compressed report now. Preserve all findings verbatim, include every source and citation, and skip think_tool calls."""
+COMPRESS_RESEARCH_REMINDER_PROMPT = """Using the research messages above, produce the compressed report now. 
+Remember: preserve all tavily_search findings verbatim, skip think_tool calls, and include every source with inline citations."""
+    

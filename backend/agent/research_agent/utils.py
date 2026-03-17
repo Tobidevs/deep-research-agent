@@ -3,8 +3,8 @@ from tavily import TavilyClient
 from dotenv import load_dotenv
 from datetime import datetime
 
-from backend.agent.research_agent.prompts import SUMMARIZE_WEBPAGE_PROMPT
-from backend.agent.research_agent.state import Summary
+from .prompts import SUMMARIZE_WEBPAGE_PROMPT
+from .state import Summary
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage

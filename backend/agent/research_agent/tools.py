@@ -15,11 +15,13 @@ def tavily_search(
     """
     Fetch results from Tavily Search API with content summarization
 
-    @param query: a single search query string to execute against the Tavily API.
-    @param max_results: The maximum number of search results to return, injected as a tool argument.
-    @param topics: An optional list of topics to filter the search results, injected as a tool argument.
+    Args: 
+        query: The search query string to execute against the Tavily API.
+        max_results: Maximum number of search results to retrieve.
+        topics: Topic filter for search results, can be "general", "news", or "finance".
 
-    @return: A list of dictionaries containing the search results from the Tavily API.
+    Returns:
+        A list of dictionaries containing the search results from the Tavily API.
     """
     search_results = tavily_search_multiple(
         [query], max_results=max_results, topic=topics, include_raw_content=True
