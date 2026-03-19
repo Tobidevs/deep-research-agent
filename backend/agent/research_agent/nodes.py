@@ -1,3 +1,5 @@
+import asyncio
+
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
     HumanMessage,
@@ -68,28 +70,34 @@ def should_continue(
     return "compress_research"
 
 
-def tool_node(state: ResearcherState):
+async def tool_node(state: ResearcherState):
     """Execute all tool calls from previous LLM response.
     Returns updated state with tool execution results.
     """
     tool_calls = state["researcher_messages"][-1].tool_calls
-    print(tool_calls)
 
-    # Execute each tool call and collect results
-    observations = []
-    for tool_call in tool_calls:
-        tool = tools_dict.get(tool_call["name"])
-        observations.append(tool.invoke(tool_call["args"]))
-
-    # Create tool message outputs
-    tool_outputs = [
-        ToolMessage(
-            content=observation,
-            tool_name=tool_call["name"],
-            tool_call_id=tool_call["id"],
-        )
-        for tool_call, observation in zip(tool_calls, observations)
+    # Build a coroutine for each tool call to execute them concurrently
+    tasks = [
+        tools_dict[tool_call["name"]].ainvoke(tool_call["args"])
+        for tool_call in tool_calls
     ]
+
+    # Run all tool calls concurrently
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    tool_outputs = []
+    for tool_call, result in zip(tool_calls, results):
+        if isinstance(result, Exception):
+            print(f"Tool call failed for '{tool_call['name']}': {result}")
+            continue
+        tool_outputs.append(
+            ToolMessage(
+                content=result,
+                tool_name=tool_call["name"],
+                tool_call_id=tool_call["id"],
+            )
+        )
+
     return {"researcher_messages": tool_outputs}
 
 

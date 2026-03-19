@@ -4,6 +4,7 @@ from langchain_core.messages import HumanMessage
 
 from .nodes import llm_call, should_continue, tool_node, compress_research
 from .state import ResearcherState
+import asyncio
 
 
 research_agent_builder = StateGraph(ResearcherState)
@@ -21,8 +22,8 @@ research_agent_builder.add_conditional_edges(
         "compress_research": "compress_research",  # Provide final answer
     },
 )
-research_agent_builder.add_edge("tool_node", "llm_call") # Loop back for more research
-research_agent_builder.add_edge("compress_research", END) # End the graph
+research_agent_builder.add_edge("tool_node", "llm_call")  # Loop back for more research
+research_agent_builder.add_edge("compress_research", END)  # End the graph
 
 research_agent = research_agent_builder.compile()
 
@@ -38,11 +39,19 @@ For integration and other features beyond what I listed, I am open to options. N
 Please focus on official product sources and ensure the information is up-to-date and matches these explicit criteria.
 """
 
-result = research_agent.invoke({"researcher_messages": [HumanMessage(content=test_research_brief)], })
-print("Compressed Research Output:")
-print(result["compressed_research"])
-print("-" * 50)
-print("Raw Notes Collected:")
-for note in result["raw_notes"]:
-    print(f"- {note}")
 
+async def test_research_agent():
+    result = await research_agent.ainvoke(
+        {
+            "researcher_messages": [HumanMessage(content=test_research_brief)],
+        }
+    )
+    print("Compressed Research Output:")
+    print(result["compressed_research"])
+    print("-" * 50)
+    print("Raw Notes Collected:")
+    for note in result["raw_notes"]:
+        print(f"- {note}")
+
+
+asyncio.run(test_research_agent())

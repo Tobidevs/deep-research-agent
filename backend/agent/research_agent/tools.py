@@ -5,7 +5,7 @@ from langchain_core.tools import tool, InjectedToolArg
 from .utils import tavily_search_multiple, deduplicate_search_results, process_search_results, format_search_output
 
 @tool(parse_docstring=True)
-def tavily_search(
+async def tavily_search(
     query: str,
     max_results: Annotated[int, InjectedToolArg] = 3,
     topics: Annotated[
@@ -23,13 +23,13 @@ def tavily_search(
     Returns:
         A list of dictionaries containing the search results from the Tavily API.
     """
-    search_results = tavily_search_multiple(
+    search_results = await tavily_search_multiple(
         [query], max_results=max_results, topic=topics, include_raw_content=True
     )
     
     unique_results = deduplicate_search_results(search_results)
     
-    summarized_results = process_search_results(unique_results)
+    summarized_results = await process_search_results(unique_results)
     
     return format_search_output(summarized_results)
 

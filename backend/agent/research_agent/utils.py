@@ -1,5 +1,6 @@
+import asyncio
 from typing import List, Literal, Annotated
-from tavily import TavilyClient
+from tavily import AsyncTavilyClient
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -10,25 +11,27 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool, InjectedToolArg
 
-load_dotenv()  
+load_dotenv()
 
-tavily_client = TavilyClient()
+tavily_async_client = AsyncTavilyClient()
 model = init_chat_model(
     model="openai:gpt-4o-mini",
     temperature=0.0,
 )
 
+
 def get_todays_date():
     """Return today's date as a string."""
     return datetime.now().strftime("%a %b %-d, %Y")
 
-def tavily_search_multiple(
-    search_queries: List[str], 
-    max_results: int = 3, 
-    topic: Literal["general", "news", "finance"] = "general", 
-    include_raw_content: bool = True, 
+
+async def tavily_search_multiple(
+    search_queries: List[str],
+    max_results: int = 3,
+    topic: Literal["general", "news", "finance"] = "general",
+    include_raw_content: bool = True,
 ) -> List[dict]:
-    """Perform search using Tavily API for multiple queries.
+    """Perform async search using Tavily API for multiple queries.
 
     Args:
         search_queries: List of search queries to execute
@@ -40,18 +43,28 @@ def tavily_search_multiple(
         List of search result dictionaries
     """
 
-    # Execute searches sequentially and collect results
-    search_docs = []
-    for query in search_queries:
-        result = tavily_client.search(
+    tasks = [
+        tavily_async_client.search(
             query,
             max_results=max_results,
             include_raw_content=include_raw_content,
-            topic=topic
+            topic=topic,
         )
-        search_docs.append(result)
+        for query in search_queries
+    ]
+
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    search_docs = []
+    for query, result in zip(search_queries, results):
+        if isinstance(result, Exception):
+            print(f"Search failed for '{query}': {result}")
+        else:
+            search_docs.append(result)
 
     return search_docs
+
+
 
 def deduplicate_search_results(search_results: List[dict]) -> dict:
     """Deduplicate search results by URL to avoid processing duplicate content.
@@ -65,12 +78,13 @@ def deduplicate_search_results(search_results: List[dict]) -> dict:
     unique_results = {}
 
     for response in search_results:
-        for result in response['results']:
-            url = result['url']
+        for result in response["results"]:
+            url = result["url"]
             if url not in unique_results:
                 unique_results[url] = result
 
     return unique_results
+
 
 def summarize_webpage_content(webpage_content: str) -> str:
     """Summarize webpage content using the configured summarization model.
@@ -86,12 +100,15 @@ def summarize_webpage_content(webpage_content: str) -> str:
         summarization_model = model.with_structured_output(Summary)
 
         # Generate summary
-        summary = summarization_model.invoke([
-            HumanMessage(content=SUMMARIZE_WEBPAGE_PROMPT.format(
-                webpage_content=webpage_content, 
-                date=get_todays_date()
-            ))
-        ])
+        summary = summarization_model.invoke(
+            [
+                HumanMessage(
+                    content=SUMMARIZE_WEBPAGE_PROMPT.format(
+                        webpage_content=webpage_content, date=get_todays_date()
+                    )
+                )
+            ]
+        )
 
         # Format summary with clear structure
         formatted_summary = (
@@ -103,9 +120,14 @@ def summarize_webpage_content(webpage_content: str) -> str:
 
     except Exception as e:
         print(f"Failed to summarize webpage: {str(e)}")
-        return webpage_content[:1000] + "..." if len(webpage_content) > 1000 else webpage_content
+        return (
+            webpage_content[:1000] + "..."
+            if len(webpage_content) > 1000
+            else webpage_content
+        )
 
-def process_search_results(unique_results: dict) -> dict:
+
+async def process_search_results(unique_results: dict) -> dict:
     """Process search results by summarizing content where available.
 
     Args:
@@ -114,22 +136,44 @@ def process_search_results(unique_results: dict) -> dict:
     Returns:
         Dictionary of processed results with summaries
     """
+    # Old synchronous version for reference:
+    # summarized_results = {}
+
+    # for url, result in unique_results.items():
+    #     # Use existing content if no raw content for summarization
+    #     if not result.get("raw_content"):
+    #         content = result["content"]
+    #     else:
+    #         # Summarize raw content for better processing
+    #         content = summarize_webpage_content(result["raw_content"])
+
+    #     summarized_results[url] = {"title": result["title"], "content": content}
+
+    # return summarized_results
+
     summarized_results = {}
 
-    for url, result in unique_results.items():
-        # Use existing content if no raw content for summarization
-        if not result.get("raw_content"):
-            content = result['content']
+    # Build a list of coroutines for summarizing each webpage content concurrently
+    tasks = [
+        asyncio.to_thread(summarize_webpage_content, result["raw_content"])
+        for result in unique_results.values()
+    ]
+
+    summarized_contents = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    for (url, result), summarized_content in zip(unique_results.items(), summarized_contents):
+        if isinstance(summarized_content, Exception):
+            print(f"Summarization failed for '{url}': {summarized_content}")
+            content = result["content"]  # Fallback to original content on failure
         else:
-            # Summarize raw content for better processing
-            content = summarize_webpage_content(result['raw_content'])
+            content = summarized_content
 
-        summarized_results[url] = {
-            'title': result['title'],
-            'content': content
-        }
-
+        summarized_results[url] = {"title": result["title"], "content": content}
+        
     return summarized_results
+        
+    
+
 
 def format_search_output(summarized_results: dict) -> str:
     """Format search results into a well-structured string output.
