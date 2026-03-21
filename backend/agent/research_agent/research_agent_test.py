@@ -48,10 +48,10 @@ async def test_research_agent():
     )
     print("Compressed Research Output:")
     print(result["compressed_research"])
-    print("-" * 50)
-    print("Raw Notes Collected:")
-    for note in result["raw_notes"]:
-        print(f"- {note}")
+    # print("-" * 50)
+    # print("Raw Notes Collected:")
+    # for note in result["raw_notes"]:
+    #     print(f"- {note}")
 
 
 asyncio.run(test_research_agent())

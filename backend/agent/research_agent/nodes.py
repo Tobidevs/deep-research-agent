@@ -107,23 +107,28 @@ def compress_research(state: ResearcherState):
     Takes all the research messages and tool outputs and creates a compressed
     summary suitable for the supervisor's decision-making.
     """
+    # Todo: Implement Supervisor evaluation 
+    # messages = (
+    #     [SystemMessage(content=COMPRESS_RESEARCH_SYSTEM_PROMPT)]
+    #     + state.get("researcher_messages", [])
+    #     + [HumanMessage(content=COMPRESS_RESEARCH_REMINDER_PROMPT)]
+    # )
+    # response = compress_model.invoke(messages)
 
-    messages = (
-        [SystemMessage(content=COMPRESS_RESEARCH_SYSTEM_PROMPT)]
-        + state.get("researcher_messages", [])
-        + [HumanMessage(content=COMPRESS_RESEARCH_REMINDER_PROMPT)]
-    )
-    response = compress_model.invoke(messages)
+    # # Extract raw notes from tool and AI messages
+    # raw_notes = [
+    #     str(m.content)
+    #     for m in filter_messages(
+    #         state["researcher_messages"], include_types=["tool", "ai"]
+    #     )
+    # ]
 
-    # Extract raw notes from tool and AI messages
-    raw_notes = [
-        str(m.content)
-        for m in filter_messages(
-            state["researcher_messages"], include_types=["tool", "ai"]
-        )
-    ]
-
+    # return {
+    #     "compressed_research": str(response.content),
+    #     "raw_notes": ["\n".join(raw_notes)],
+    # }
+    
     return {
-        "compressed_research": str(response.content),
-        "raw_notes": ["\n".join(raw_notes)],
+        "compressed_research": "Compressed research summary placeholder.",
+        "raw_notes": ["Raw notes placeholder."],
     }
