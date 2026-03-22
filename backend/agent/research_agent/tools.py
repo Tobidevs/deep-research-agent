@@ -44,19 +44,25 @@ async def tavily_search(
 
     unique_results = deduplicate_search_results(search_results)
 
-    processed_results = await process_search_results(unique_results, use_summarizations=False)
+    processed_results = await process_search_results(
+        unique_results, use_summarizations=False
+    )
 
     return format_search_output(processed_results)
 
 
 @tool(parse_docstring=True)
-def think_tool(reflection: str) -> str:
+def think_tool(reflection: str, is_research_complete: bool) -> dict:
     """Reflect on research progress and plan next steps.
 
     Args:
         reflection: Analysis of current findings, gaps, and whether to continue searching
+        is_research_complete: Indicator of whether the research is complete and ready for reporting
 
     Returns:
-        Confirmation that reflection was recorded
+        A dictionary confirming the reflection was recorded and whether research is complete
     """
-    return "Reflection recorded."
+    return {
+        "status": "Reflection recorded",
+        "is_research_complete": is_research_complete,
+    }

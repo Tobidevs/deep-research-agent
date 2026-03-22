@@ -2,7 +2,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
 
-from .nodes import llm_call, should_continue, tool_node, compress_research
+from .nodes import llm_call, should_continue, tool_node, final_report
 from .state import ResearcherState
 import asyncio
 
@@ -11,19 +11,19 @@ research_agent_builder = StateGraph(ResearcherState)
 
 research_agent_builder.add_node("llm_call", llm_call)
 research_agent_builder.add_node("tool_node", tool_node)
-research_agent_builder.add_node("compress_research", compress_research)
+research_agent_builder.add_node("final_report", final_report)
 
 research_agent_builder.add_edge(START, "llm_call")
+research_agent_builder.add_edge("llm_call", "tool_node")
 research_agent_builder.add_conditional_edges(
-    "llm_call",
+    "tool_node",
     should_continue,
     {
-        "tool_node": "tool_node",  # Continue research loop
-        "compress_research": "compress_research",  # Provide final answer
+        "llm_call": "llm_call",  # Loop back for more research
+        "final_report": "final_report",  # Provide final answer
     },
 )
-research_agent_builder.add_edge("tool_node", "llm_call")  # Loop back for more research
-research_agent_builder.add_edge("compress_research", END)  # End the graph
+research_agent_builder.add_edge("final_report", END)  # End the graph
 
 research_agent = research_agent_builder.compile()
 
@@ -44,14 +44,14 @@ async def test_research_agent():
     result = await research_agent.ainvoke(
         {
             "researcher_messages": [HumanMessage(content=test_research_brief)],
+            "research_topic": test_research_brief,
         }
     )
-    print("Compressed Research Output:")
-    print(result["compressed_research"])
-    # print("-" * 50)
-    # print("Raw Notes Collected:")
-    # for note in result["raw_notes"]:
-    #     print(f"- {note}")
+    print("Final Research Report:")
+    print(result["final_report"])
+    print("Cited Sources:")
+    for source in result["sources"]:
+        print(f"- {source}")
 
 
 asyncio.run(test_research_agent())

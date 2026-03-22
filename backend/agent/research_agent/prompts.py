@@ -30,4 +30,8 @@ Preserving every source is critical — a downstream LLM will merge this report 
 
 COMPRESS_RESEARCH_REMINDER_PROMPT = """Using the research messages above, produce the compressed report now. 
 Remember: preserve all tavily_search findings verbatim, skip think_tool calls, and include every source with inline citations."""
-    
+
+FINAL_REPORT_PROMPT = """Using the research findings above, write a comprehensive report on:
+RESEARCH TOPIC: {research_topic}
+
+Choose a report structure appropriate for the topic. Use inline citations [1], [2]... throughout. Do not introduce any information not present in the research above."""
