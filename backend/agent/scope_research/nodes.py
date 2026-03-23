@@ -8,7 +8,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage
 from dotenv import load_dotenv
 from langgraph.graph import START, END
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 from langsmith import traceable
 
 from typing import Literal
@@ -24,9 +24,11 @@ model = init_chat_model(
 clarify_model = model.with_structured_output(ClarifyWithUser)
 research_model = model.with_structured_output(ResearchQuestion)
 
+
 def get_todays_date():
     """Return today's date as a string."""
     return datetime.now().strftime("%a %b %-d, %Y")
+
 
 @traceable
 def clarify_with_user(state: AgentState) -> Command[AgentState]:
@@ -43,14 +45,27 @@ def clarify_with_user(state: AgentState) -> Command[AgentState]:
     )
 
     if response.need_clarification:
+        user_clarification = interrupt(
+            {
+                "kind": "clarification",
+                "question": response.question,
+            }
+        )
+
         return Command(
-        goto=END, update={"messages": [AIMessage(content=response.question)]}
-    )
+            goto="write_research_brief",
+            update={
+                "messages": [
+                    AIMessage(content=response.question),
+                    HumanMessage(content=user_clarification),
+                ]
+            },
+        )
     else:
         return Command(
-        goto="write_research_brief",
-        update={"messages": [AIMessage(content=response.verification)]},
-    )
+            goto="write_research_brief",
+            update={"messages": [AIMessage(content=response.verification)]},
+        )
 
 
 @traceable
@@ -67,7 +82,7 @@ def write_research_brief(state: AgentState):
             )
         ]
     )
-    
+
     return {
         "research_brief": response.research_brief,
         "supervisor_message": [HumanMessage(content=f"{response.research_brief}.")],
