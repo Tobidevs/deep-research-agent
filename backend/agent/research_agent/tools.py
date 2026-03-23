@@ -62,7 +62,4 @@ def think_tool(reflection: str, is_research_complete: bool) -> dict:
     Returns:
         A dictionary confirming the reflection was recorded and whether research is complete
     """
-    return {
-        "status": "Reflection recorded",
-        "is_research_complete": is_research_complete,
-    }
+    return "Reflection recorded"

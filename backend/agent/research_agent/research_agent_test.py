@@ -1,31 +1,8 @@
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
+from langgraph.types import Command
 
-from .nodes import llm_call, should_continue, tool_node, final_report
-from .state import ResearcherState
+from ..agent import deep_research_agent
 import asyncio
-
-
-research_agent_builder = StateGraph(ResearcherState)
-
-research_agent_builder.add_node("llm_call", llm_call)
-research_agent_builder.add_node("tool_node", tool_node)
-research_agent_builder.add_node("final_report", final_report)
-
-research_agent_builder.add_edge(START, "llm_call")
-research_agent_builder.add_edge("llm_call", "tool_node")
-research_agent_builder.add_conditional_edges(
-    "tool_node",
-    should_continue,
-    {
-        "llm_call": "llm_call",  # Loop back for more research
-        "final_report": "final_report",  # Provide final answer
-    },
-)
-research_agent_builder.add_edge("final_report", END)  # End the graph
-
-research_agent = research_agent_builder.compile()
 
 # Testing purposes only
 
@@ -41,12 +18,24 @@ Please focus on official product sources and ensure the information is up-to-dat
 
 
 async def test_research_agent():
-    result = await research_agent.ainvoke(
-        {
-            "researcher_messages": [HumanMessage(content=test_research_brief)],
-            "research_topic": test_research_brief,
-        }
+    config = {"configurable": {"thread_id": "deep-research-test"}}
+    result = await deep_research_agent.ainvoke(
+        {"messages": [HumanMessage(content=test_research_brief)]},
+        config=config,
     )
+
+    if "__interrupt__" in result:
+        print("Graph interrupted, resuming with test clarification...")
+        result = await deep_research_agent.ainvoke(
+            Command(
+                resume=(
+                    "Team size is 40, budget is around $600/month, and integrations "
+                    "with Slack and Google Workspace are required."
+                )
+            ),
+            config=config,
+        )
+
     print("Final Research Report:")
     print(result["final_report"])
     print("Cited Sources:")
