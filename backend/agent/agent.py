@@ -7,10 +7,15 @@ from langgraph.types import Command
 from typing import Annotated, Sequence, TypedDict
 import asyncio
 import operator
+import logging
 
 from .scope_research.nodes import clarify_with_user, write_research_brief
 from .scope_research.state import AgentInputState, AgentState
 from .research_agent.nodes import llm_call, should_continue, tool_node, final_report
+from .errors import AgentWorkflowError
+
+
+logger = logging.getLogger(__name__)
 
 
 class DeepResearchState(TypedDict):
@@ -44,11 +49,17 @@ scope_research = deep_researcher_builder.compile(checkpointer=InMemorySaver())
 
 def prepare_research_input(state: DeepResearchState):
     """Map scoped brief output into the research agent's expected input fields."""
-    research_brief = state.get("research_brief") or ""
+    research_brief = state.get("research_brief")
+    if not isinstance(research_brief, str) or not research_brief.strip():
+        raise AgentWorkflowError(
+            "Cannot start research phase because the research brief is missing."
+        )
+
+    normalized_brief = research_brief.strip()
 
     return {
-        "research_topic": research_brief,
-        "researcher_messages": [HumanMessage(content=research_brief)],
+        "research_topic": normalized_brief,
+        "researcher_messages": [HumanMessage(content=normalized_brief)],
         "tool_call_iterations": state.get("tool_call_iterations", 0),
         "compressed_research": state.get("compressed_research", ""),
         "final_report": state.get("final_report", None),
@@ -108,6 +119,7 @@ async def test_deep_research_agent():
     print("Cited Sources:")
     for source in result["sources"]:
         print(f"- {source}")
-        
 
+
+# Local/manual testing only. Keep disabled for app/runtime imports.
 asyncio.run(test_deep_research_agent())

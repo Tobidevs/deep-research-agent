@@ -3,6 +3,7 @@ from typing import List, Literal, Annotated
 from tavily import AsyncTavilyClient
 from dotenv import load_dotenv
 from datetime import datetime
+import logging
 
 from .prompts import SUMMARIZE_WEBPAGE_PROMPT
 from .state import Summary
@@ -10,8 +11,10 @@ from .state import Summary
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool, InjectedToolArg
+from ..errors import AgentWorkflowError, classify_exception
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 tavily_async_client = AsyncTavilyClient()
 model = init_chat_model(
@@ -61,16 +64,26 @@ async def tavily_search_multiple(
         for query in search_queries
     ]
 
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    try:
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    search_docs = []
-    for query, result in zip(search_queries, results):
-        if isinstance(result, Exception):
-            print(f"Search failed for '{query}': {result}")
-        else:
-            search_docs.append(result)
+        search_docs = []
+        for query, result in zip(search_queries, results):
+            if isinstance(result, Exception):
+                logger.warning("Search failed for '%s': %s", query, result)
+            else:
+                search_docs.append(result)
 
-    return search_docs
+        if not search_docs:
+            first_error = next(
+                (result for result in results if isinstance(result, Exception)),
+                AgentWorkflowError("No Tavily search results were returned."),
+            )
+            raise first_error
+
+        return search_docs
+    except Exception as exc:
+        raise classify_exception(exc, "tavily_search_multiple") from exc
 
 
 def deduplicate_search_results(search_results: List[dict]) -> dict:

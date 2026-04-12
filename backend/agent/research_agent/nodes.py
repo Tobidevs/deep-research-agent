@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import (
@@ -16,6 +17,10 @@ from .prompts import (
 
 from .state import ResearcherState, ResearchReport
 from .tools import tavily_search, think_tool
+from ..errors import AgentWorkflowError, classify_exception
+
+
+logger = logging.getLogger(__name__)
 
 tools = [tavily_search, think_tool]
 tools_dict = {tool.name: tool for tool in tools}
@@ -42,17 +47,18 @@ def llm_call(state: ResearcherState):
 
     Returns updated state with the model's response.
     """
-    return {
-        "researcher_messages": [
-            researcher_model.invoke(
-                [
-                    SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT),
-                ]
-                + state["researcher_messages"],
-            )
-        ]
-    }
+    try:
+        response = researcher_model.invoke(
+            [
+                SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT),
+            ]
+            + state["researcher_messages"],
+        )
+    except Exception as exc:
+        logger.exception("Failed in llm_call node")
+        raise classify_exception(exc, "llm_call") from exc
 
+    return {"researcher_messages": [response]}
 
 def should_continue(
     state: ResearcherState,
@@ -86,38 +92,63 @@ async def tool_node(state: ResearcherState):
     """Execute all tool calls from previous LLM response.
     Returns updated state with tool execution results.
     """
-    tool_calls = state["researcher_messages"][-1].tool_calls
+    try:
+        researcher_messages = state.get("researcher_messages", [])
+        if not researcher_messages:
+            raise AgentWorkflowError("Missing researcher messages for tool execution.")
 
-    # Build a coroutine for each tool call to execute them concurrently
-    tasks = [
-        tools_dict[tool_call["name"]].ainvoke(tool_call["args"])
-        for tool_call in tool_calls
-    ]
+        last_message = researcher_messages[-1]
+        tool_calls = getattr(last_message, "tool_calls", None) or []
+        if not tool_calls:
+            return {"researcher_messages": []}
 
-    # Run all tool calls concurrently
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+        tasks = []
+        valid_tool_calls = []
+        for tool_call in tool_calls:
+            tool_name = tool_call.get("name")
+            tool_args = tool_call.get("args", {})
+            if not tool_name or tool_name not in tools_dict:
+                raise AgentWorkflowError(
+                    f"Invalid tool call requested by model: {tool_name or 'unknown'}"
+                )
+            valid_tool_calls.append(tool_call)
+            tasks.append(tools_dict[tool_name].ainvoke(tool_args))
 
-    is_research_complete = (
-        tool_calls[-1]["args"].get("is_research_complete", False)
-        if tool_calls
-        else False
-    )
-    
-    tool_outputs = []
-    for tool_call, result in zip(tool_calls, results):
-        if isinstance(result, Exception):
-            print(f"Tool call failed for '{tool_call['name']}': {result}")
-            continue
-        tool_outputs.append(
-            ToolMessage(
-                content=result,
-                tool_name=tool_call["name"],
-                tool_call_id=tool_call["id"],
-                additional_kwargs={"is_research_complete": is_research_complete},
-            )
+        results = await asyncio.gather(*tasks)
+
+        is_research_complete = (
+            valid_tool_calls[-1]["args"].get("is_research_complete", False)
+            if valid_tool_calls
+            else False
         )
 
-    return {"researcher_messages": tool_outputs}
+        tool_outputs = []
+        for tool_call, result in zip(valid_tool_calls, results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Tool call failed for %s: %s", tool_call["name"], result
+                )
+                continue
+            tool_outputs.append(
+                ToolMessage(
+                    content=result,
+                    tool_name=tool_call["name"],
+                    tool_call_id=tool_call["id"],
+                    additional_kwargs={"is_research_complete": is_research_complete},
+                )
+            )
+
+        if not tool_outputs:
+            first_error = next(
+                (result for result in results if isinstance(result, Exception)),
+                AgentWorkflowError("All tool calls failed."),
+            )
+            raise first_error
+
+        return {"researcher_messages": tool_outputs}
+    except Exception as exc:
+        logger.exception("Failed in tool_node")
+        raise classify_exception(exc, "tool_node") from exc
 
 
 def final_report(state: ResearcherState):
@@ -147,15 +178,19 @@ def final_report(state: ResearcherState):
     #     "raw_notes": ["\n".join(raw_notes)],
     # }
 
-    response = structured_final_report_model.invoke(
-        state["researcher_messages"]
-        + [
-            HumanMessage(
-                content=FINAL_REPORT_PROMPT.format(
-                    research_topic=state["research_topic"]
-                )
-            ),
-        ]
-    )
+    try:
+        response = structured_final_report_model.invoke(
+            state["researcher_messages"]
+            + [
+                HumanMessage(
+                    content=FINAL_REPORT_PROMPT.format(
+                        research_topic=state["research_topic"]
+                    )
+                ),
+            ]
+        )
+    except Exception as exc:
+        logger.exception("Failed in final_report node")
+        raise classify_exception(exc, "final_report") from exc
 
     return {"final_report": response.report, "sources": response.sources}

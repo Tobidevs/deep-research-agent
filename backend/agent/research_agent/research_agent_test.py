@@ -16,7 +16,7 @@ For integration and other features beyond what I listed, I am open to options. N
 Please focus on official product sources and ensure the information is up-to-date and matches these explicit criteria.
 """
 
-
+# Testing purpose only
 async def test_research_agent():
     config = {"configurable": {"thread_id": "deep-research-test"}}
     result = await deep_research_agent.ainvoke(
@@ -25,7 +25,6 @@ async def test_research_agent():
     )
 
     if "__interrupt__" in result:
-        print("Graph interrupted, resuming with test clarification...")
         result = await deep_research_agent.ainvoke(
             Command(
                 resume=(
@@ -43,4 +42,4 @@ async def test_research_agent():
         print(f"- {source}")
 
 
-asyncio.run(test_research_agent())
+# asyncio.run(test_research_agent())

@@ -1,4 +1,5 @@
 import os
+import logging
 from .state import AgentState, ClarifyWithUser, ResearchQuestion
 from .prompts import (
     CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT,
@@ -13,6 +14,10 @@ from langsmith import traceable
 
 from typing import Literal
 from datetime import datetime
+from ..errors import classify_exception
+
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -34,15 +39,19 @@ def get_todays_date():
 def clarify_with_user(state: AgentState) -> Command[AgentState]:
     """Clarify the user's question if needed."""
 
-    response = clarify_model.invoke(
-        [
-            HumanMessage(
-                content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
-                    messages=state["messages"], date=get_todays_date()
+    try:
+        response = clarify_model.invoke(
+            [
+                HumanMessage(
+                    content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
+                        messages=state["messages"], date=get_todays_date()
+                    )
                 )
-            )
-        ]
-    )
+            ]
+        )
+    except Exception as exc:
+        logger.exception("Failed in clarify_with_user node")
+        raise classify_exception(exc, "clarify_with_user") from exc
 
     if response.need_clarification:
         user_clarification = interrupt(
@@ -51,6 +60,7 @@ def clarify_with_user(state: AgentState) -> Command[AgentState]:
                 "question": response.question,
             }
         )
+        print(f"User clarification: {user_clarification}")
 
         return Command(
             goto="write_research_brief",
@@ -73,15 +83,19 @@ def write_research_brief(state: AgentState):
     """Write a research brief based on the user's input."""
 
     # Generate a research brief based on conversation history
-    response = research_model.invoke(
-        [
-            HumanMessage(
-                content=TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT.format(
-                    messages=state["messages"], date=get_todays_date()
+    try:
+        response = research_model.invoke(
+            [
+                HumanMessage(
+                    content=TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT.format(
+                        messages=state["messages"], date=get_todays_date()
+                    )
                 )
-            )
-        ]
-    )
+            ]
+        )
+    except Exception as exc:
+        logger.exception("Failed in write_research_brief node")
+        raise classify_exception(exc, "write_research_brief") from exc
 
     return {
         "research_brief": response.research_brief,
