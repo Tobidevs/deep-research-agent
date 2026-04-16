@@ -1,10 +1,11 @@
 import os
 import logging
-from .state import AgentState, ClarifyWithUser, ResearchQuestion
+from .state import ClarifyWithUser, ResearchQuestion
 from .prompts import (
     CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT,
-    TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT,
+    TRANSFORM_MESSAGES_INTO_RESEARCH_BRIEF_PROMPT,
 )
+from ..state import DeepResearchState
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AIMessage, HumanMessage
 from dotenv import load_dotenv
@@ -36,15 +37,16 @@ def get_todays_date():
 
 
 @traceable
-def clarify_with_user(state: AgentState) -> Command[AgentState]:
+def clarify_with_user(state: DeepResearchState) -> Command[DeepResearchState]:
     """Clarify the user's question if needed."""
 
     try:
         response = clarify_model.invoke(
-            [
+            state["messages"]
+            + [
                 HumanMessage(
                     content=CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT.format(
-                        messages=state["messages"], date=get_todays_date()
+                        date=get_todays_date()
                     )
                 )
             ]
@@ -74,21 +76,21 @@ def clarify_with_user(state: AgentState) -> Command[AgentState]:
     else:
         return Command(
             goto="write_research_brief",
-            update={"messages": [AIMessage(content=response.verification)]},
         )
 
 
 @traceable
-def write_research_brief(state: AgentState):
+def write_research_brief(state: DeepResearchState):
     """Write a research brief based on the user's input."""
 
     # Generate a research brief based on conversation history
     try:
         response = research_model.invoke(
-            [
+            state["messages"]
+            + [
                 HumanMessage(
-                    content=TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT.format(
-                        messages=state["messages"], date=get_todays_date()
+                    content=TRANSFORM_MESSAGES_INTO_RESEARCH_BRIEF_PROMPT.format(
+                        date=get_todays_date()
                     )
                 )
             ]
@@ -98,6 +100,7 @@ def write_research_brief(state: AgentState):
         raise classify_exception(exc, "write_research_brief") from exc
 
     return {
+        "researcher_messages": [HumanMessage(content=response.research_brief)],
         "research_brief": response.research_brief,
-        "supervisor_message": [HumanMessage(content=f"{response.research_brief}.")],
+        "supervisor_message": [HumanMessage(content=response.research_brief)],
     }

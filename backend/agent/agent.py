@@ -1,70 +1,31 @@
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage
-from langgraph.graph.message import add_messages
-from langchain_core.messages import BaseMessage
 from langgraph.types import Command
-from typing import Annotated, Sequence, TypedDict
 import asyncio
-import operator
 import logging
+import uuid
 
 from .scope_research.nodes import clarify_with_user, write_research_brief
-from .scope_research.state import AgentInputState, AgentState
+from .scope_research.state import AgentInputState
 from .research_agent.nodes import llm_call, should_continue, tool_node, final_report
+from deepeval.integrations.langchain import CallbackHandler
 from .errors import AgentWorkflowError
+from .state import DeepResearchState
 
 
 logger = logging.getLogger(__name__)
 
 
-class DeepResearchState(TypedDict):
-    """Unified state shape for scope + deep research phases."""
+# scope_research_builder = StateGraph(AgentState, input_schema=AgentInputState)
 
-    # Scope phase fields
-    messages: Annotated[Sequence[BaseMessage], add_messages]
-    research_brief: str | None
-    supervisor_message: Annotated[Sequence[BaseMessage], add_messages]
-    notes: Annotated[list[str], operator.add]
+# scope_research_builder.add_node("clarify_with_user", clarify_with_user)
+# scope_research_builder.add_node("write_research_brief", write_research_brief)
 
-    # Research phase fields
-    researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
-    research_topic: str
-    tool_call_iterations: int
-    compressed_research: str
-    final_report: str | None
-    sources: list[str]
+# scope_research_builder.add_edge(START, "clarify_with_user")
+# scope_research_builder.add_edge("write_research_brief", END)
 
-
-deep_researcher_builder = StateGraph(AgentState, input_schema=AgentInputState)
-
-deep_researcher_builder.add_node("clarify_with_user", clarify_with_user)
-deep_researcher_builder.add_node("write_research_brief", write_research_brief)
-
-deep_researcher_builder.add_edge(START, "clarify_with_user")
-deep_researcher_builder.add_edge("write_research_brief", END)
-
-scope_research = deep_researcher_builder.compile(checkpointer=InMemorySaver())
-
-
-def prepare_research_input(state: DeepResearchState):
-    """Map scoped brief output into the research agent's expected input fields."""
-    research_brief = state.get("research_brief")
-    if not isinstance(research_brief, str) or not research_brief.strip():
-        raise AgentWorkflowError(
-            "Cannot start research phase because the research brief is missing."
-        )
-
-    normalized_brief = research_brief.strip()
-
-    return {
-        "research_topic": normalized_brief,
-        "researcher_messages": [HumanMessage(content=normalized_brief)],
-        "tool_call_iterations": state.get("tool_call_iterations", 0),
-        "compressed_research": state.get("compressed_research", ""),
-        "final_report": state.get("final_report", None),
-        "sources": state.get("sources", []),
-    }
+# scope_research_agent = scope_research_builder.compile(checkpointer=InMemorySaver())
 
 
 deep_research_agent_builder = StateGraph(
@@ -73,14 +34,12 @@ deep_research_agent_builder = StateGraph(
 
 deep_research_agent_builder.add_node("clarify_with_user", clarify_with_user)
 deep_research_agent_builder.add_node("write_research_brief", write_research_brief)
-deep_research_agent_builder.add_node("prepare_research_input", prepare_research_input)
 deep_research_agent_builder.add_node("llm_call", llm_call)
 deep_research_agent_builder.add_node("tool_node", tool_node)
 deep_research_agent_builder.add_node("final_report", final_report)
 
 deep_research_agent_builder.add_edge(START, "clarify_with_user")
-deep_research_agent_builder.add_edge("write_research_brief", "prepare_research_input")
-deep_research_agent_builder.add_edge("prepare_research_input", "llm_call")
+deep_research_agent_builder.add_edge("write_research_brief", "llm_call")
 deep_research_agent_builder.add_edge("llm_call", "tool_node")
 deep_research_agent_builder.add_conditional_edges(
     "tool_node",
@@ -97,8 +56,11 @@ deep_research_agent = deep_research_agent_builder.compile(checkpointer=InMemoryS
 
 # Testing purposes only
 async def test_deep_research_agent():
-    thread_id = "deep-research-session-1"
-    config = {"configurable": {"thread_id": thread_id}}
+    thread_id = str(uuid.uuid4())
+    config = {
+        "configurable": {"thread_id": thread_id},
+        "callbacks": [CallbackHandler()],
+    }
 
     result = await deep_research_agent.ainvoke(
         {"messages": [HumanMessage(content="explain god")]},
@@ -116,10 +78,11 @@ async def test_deep_research_agent():
 
     print("Final Research Report:")
     print(result["final_report"])
-    print("Cited Sources:")
-    for source in result["sources"]:
-        print(f"- {source}")
+    # print("Cited Sources:")
+    # for source in result["sources"]:
+    #     print(f"- {source}")
 
 
-# Local/manual testing only. Keep disabled for app/runtime imports.
-asyncio.run(test_deep_research_agent())
+
+# Local/manual testing only.
+# asyncio.run(test_deep_research_agent())

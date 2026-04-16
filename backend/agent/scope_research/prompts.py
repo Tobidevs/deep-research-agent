@@ -1,9 +1,5 @@
 CLARIFY_WITH_USER_INSTRUCTIONS_PROMPT = """Today is {date}.
 
-<messages>
-{messages}
-</messages>
-
 Determine if you need to ask a clarifying question before starting research.
 
 Rules:
@@ -14,11 +10,7 @@ Rules:
 If asking a question, be concise and gather everything needed in one message. Use markdown bullet points if listing multiple questions.
 """
 
-TRANSFORM_MESSAGES_INTO_RESEARCH_TOPIC_PROMPT = """Today is {date}.
-
-<messages>
-{messages}
-</messages>
+TRANSFORM_MESSAGES_INTO_RESEARCH_BRIEF_PROMPT = """Today is {date}.
 
 Translate the conversation above into a detailed research brief written in the first person from the user's perspective.
 

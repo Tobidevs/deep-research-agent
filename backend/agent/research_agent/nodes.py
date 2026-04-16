@@ -14,8 +14,8 @@ from .prompts import (
     FINAL_REPORT_PROMPT,
     RESEARCH_AGENT_SYSTEM_PROMPT,
 )
-
-from .state import ResearcherState, ResearchReport
+from ..state import DeepResearchState
+from .state import ResearchReport
 from .tools import tavily_search, think_tool
 from ..errors import AgentWorkflowError, classify_exception
 
@@ -39,20 +39,19 @@ structured_final_report_model = final_report_model.with_structured_output(
 )
 
 
-def llm_call(state: ResearcherState):
+def llm_call(state: DeepResearchState):
     """Analyze current state and decide on next action.
-    The model analyzes the current conversation state and decides whether to:
+    The model analyzes the current conversation state and decide
+     whether to:
     1. Call search tools to gather more info
     2. Provide a final answer based on gathered info
 
     Returns updated state with the model's response.
     """
     try:
+        researcher_messages = list(state.get("researcher_messages", []))
         response = researcher_model.invoke(
-            [
-                SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT),
-            ]
-            + state["researcher_messages"],
+            [SystemMessage(content=RESEARCH_AGENT_SYSTEM_PROMPT), *researcher_messages],
         )
     except Exception as exc:
         logger.exception("Failed in llm_call node")
@@ -60,8 +59,9 @@ def llm_call(state: ResearcherState):
 
     return {"researcher_messages": [response]}
 
+
 def should_continue(
-    state: ResearcherState,
+    state: DeepResearchState,
 ) -> Literal["llm_call", "final_report"]:
     """
     Determine whether to continue research or compress findings based on the last LLM response.
@@ -88,7 +88,7 @@ def should_continue(
     return "final_report"  # Move to finalizing findings
 
 
-async def tool_node(state: ResearcherState):
+async def tool_node(state: DeepResearchState):
     """Execute all tool calls from previous LLM response.
     Returns updated state with tool execution results.
     """
@@ -125,9 +125,7 @@ async def tool_node(state: ResearcherState):
         tool_outputs = []
         for tool_call, result in zip(valid_tool_calls, results):
             if isinstance(result, Exception):
-                logger.warning(
-                    "Tool call failed for %s: %s", tool_call["name"], result
-                )
+                logger.warning("Tool call failed for %s: %s", tool_call["name"], result)
                 continue
             tool_outputs.append(
                 ToolMessage(
@@ -151,7 +149,7 @@ async def tool_node(state: ResearcherState):
         raise classify_exception(exc, "tool_node") from exc
 
 
-def final_report(state: ResearcherState):
+def final_report(state: DeepResearchState):
     """Compress research findings into a concise summary.
 
     Takes all the research messages and tool outputs and creates a compressed
@@ -184,7 +182,7 @@ def final_report(state: ResearcherState):
             + [
                 HumanMessage(
                     content=FINAL_REPORT_PROMPT.format(
-                        research_topic=state["research_topic"]
+                        research_brief=state["research_brief"]
                     )
                 ),
             ]
@@ -193,4 +191,8 @@ def final_report(state: ResearcherState):
         logger.exception("Failed in final_report node")
         raise classify_exception(exc, "final_report") from exc
 
-    return {"final_report": response.report, "sources": response.sources}
+    return {
+        "final_report": response.report,
+        "sources": response.sources,
+        "messages": response.report,
+    }

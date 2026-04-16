@@ -4,15 +4,8 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph import add_messages
 from pydantic import BaseModel, Field
 
-class ResearcherState(TypedDict):
-    researcher_messages: Annotated[Sequence[BaseMessage], add_messages]
-    tool_call_iterations: int  # tracks search budget usage
-    research_topic: str
-    compressed_research: str
-    final_report: str | None  # None until report generation node runs
-    sources: list[str]  # List of cited sources in the format 'Title: URL'
 
-
+    
 class ResearcherOutputState(TypedDict):
     """
     Output state for the research agent, capturing the final outputs of the research process.
